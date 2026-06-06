@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Promptmatik - Akıllı & Dinamik Prompt Tasarımcısı</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+
+    <!-- Custom Stylesheet -->
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <div class="app-container">
+        
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-actions">
+                <button type="button" id="theme-toggle" class="header-action-btn" aria-label="Tema Değiştir">
+                    <span class="theme-icon">☀️</span>
+                </button>
+                <button type="button" id="api-settings-toggle" class="header-action-btn" aria-label="API Ayarları">
+                    <span class="settings-icon">⚙️</span>
+                </button>
+            </div>
+            <div class="header-logo">
+                <span class="logo-icon">⚡</span>
+                <h1>PROMPT<span>MATİK</span></h1>
+            </div>
+            <p class="header-tagline">Hatırlamayı unuttuğunuz tüm prompt bileşenlerini tek bir panelde birleştirin ve API üzerinden anında test edin.</p>
+        </header>
+
+        <!-- Secure API Modal Dialog -->
+        <dialog id="api-settings-dialog" class="api-dialog">
+            <div class="card api-card">
+                <div class="card-header">
+                    <h2>🔒 Güvenli API Yapılandırması</h2>
+                    <div class="api-header-actions">
+                        <span class="security-status status-locked" id="status-badge">Kilitli 🔒</span>
+                        <button type="button" class="btn-close-dialog" id="btn-close-api-dialog" aria-label="Kapat">✕</button>
+                    </div>
+                </div>
+
+                <!-- Unlocked / Active State Panel -->
+                <div class="api-state-unlocked hidden" id="api-panel-unlocked">
+                    <div class="api-active-indicator">
+                        <span class="active-pulse"></span>
+                        <span class="active-text" id="active-api-text">API Anahtarı Aktif (Hafızada)</span>
+                    </div>
+
+                    <div class="form-group" style="margin-top: 1rem;">
+                        <label for="unlocked-model-select">🎯 Aktif Model</label>
+                        <select id="unlocked-model-select" class="form-control">
+                            <!-- Dynamically populated based on provider -->
+                        </select>
+                    </div>
+
+                    <div class="api-unlocked-actions" style="display: flex; flex-direction: column; gap: 0.75rem; margin-top: 1.25rem;">
+                        <button type="button" class="btn btn-secondary w-full" id="btn-show-setup">
+                            ⚙️ Yeni Anahtar Ekle / Ayarları Düzenle
+                        </button>
+                        <button type="button" class="btn-text btn-danger" style="justify-content: center;" id="btn-lock-session">
+                            🔒 Oturumu Kapat / Belleği Temizle
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Locked State Form (Requires PIN to decrypt) -->
+                <div class="api-state-locked" id="api-panel-locked">
+                    <p class="api-info">LocalStorage'da şifrelenmiş bir API anahtarı bulundu. Kilidi açmak için Uygulama Şifrenizi (PIN) girin.</p>
+                    <div class="api-form-row">
+                        <div class="input-wrapper">
+                            <span class="input-icon">🔑</span>
+                            <input type="password" id="unlock-pin" placeholder="Uygulama Şifresi / PIN" class="form-control">
+                        </div>
+                        <button type="button" class="btn btn-primary" id="btn-unlock">Kilidi Aç</button>
+                    </div>
+                    <div class="api-actions">
+                        <button type="button" class="btn-text btn-danger" id="btn-delete-key">⚠️ Kayıtlı Anahtarı Sil</button>
+                    </div>
+                </div>
+
+                <!-- Unlocked / Setup State Form -->
+                <div class="api-state-setup hidden" id="api-panel-setup">
+                    <p class="api-info">API anahtarınız tarayıcınızda plain-text olarak saklanmaz. Belirleyeceğiniz PIN kodu ile AES-256 algoritmasıyla şifrelenir.</p>
+                    
+                    <div class="form-group">
+                        <label for="api-provider">Sağlayıcı / Bağlantı Türü</label>
+                        <select id="api-provider" class="form-control">
+                            <option value="gemini">Google Gemini (Doğrudan)</option>
+                            <option value="openai">OpenAI (Doğrudan)</option>
+                            <option value="deepseek">Deepseek (Doğrudan)</option>
+                            <option value="anthropic">Anthropic (Doğrudan)</option>
+                            <option value="openrouter">OpenRouter (Tüm Modeller)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="api-model">Model</label>
+                        <select id="api-model" class="form-control">
+                            <!-- Dynamically populated based on provider -->
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="api-key">API Anahtarı (API Key)</label>
+                        <input type="password" id="api-key" placeholder="AIzaSy... veya sk-..." class="form-control">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="setup-pin">Uygulama Şifresi / PIN Kodu (Şifreleme İçin)</label>
+                        <input type="password" id="setup-pin" placeholder="En az 4 karakterli şifre veya PIN" class="form-control">
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+                        <button type="button" class="btn btn-primary" id="btn-save-api">
+                            🔒 Şifrele ve Kaydet
+                        </button>
+                        <button type="button" class="btn btn-secondary" id="btn-cancel-setup">
+                            Vazgeç
+                        </button>
+                    </div>
+                    <p class="api-disclaimer-info">API kullanımına devam ederek <a href="#disclaimer" id="link-to-disclaimer">Kullanım Koşulları ve Sorumluluk Reddi</a> şartlarını kabul etmiş olursunuz.</p>
+                </div>
+
+                <!-- Collapsible Info / FAQ for API Benefits -->
+                <details class="api-info-faq">
+                    <summary>💡 Neden Kendi API Anahtarımı Kullanmalıyım? (Maliyet &amp; Limitler)</summary>
+                    <div class="faq-content">
+                        <p><strong>1. ChatGPT Plus ($20)'tan Çok Daha Ucuzdur:</strong> Yapay zekayı yoğun kullansanız dahi, API ile sadece harcadığınız kadar ödersiniz. Aylık fatura genellikle $1-3'ı geçmez (Neredeyse 10 kat daha ucuz!).</p>
+                        <p><strong>2. Limit ve Sansür Duvarını Aşarsınız:</strong> Ücretsiz arayüzlerdeki sık saatlik bekleme limitleri ve katı filtrelemeler API kullanımında yoktur. En performanslı ham modellere sınırsızca erişirsiniz.</p>
+                        <p><strong>3. İki Farklı Kullanım Modu:</strong></p>
+                        <ul>
+                            <li><em>Standart Mod (Ücretsiz):</em> Formu doldurun, prompt'u kopyalayıp ücretsiz kendi ChatGPT/Gemini hesabınızda kullanın.</li>
+                            <li><em>Power User Modu (API):</em> API anahtarınızı şifreleyip kaydedin. Formu doldurup tek tıkla doğrudan buradan çalıştırın.</li>
+                        </ul>
+                    </div>
+                </details>
+            </div>
+        </dialog>
+
+        <!-- Main Workspace Flow (Vertical Stack, Centered) -->
+        <main class="workspace-flow">
+            
+            <!-- 1. Ready Scenarios Segment -->
+            <div class="card scenarios-card">
+                <div class="card-header">
+                    <h2>🚀 Hazır Senaryo Şablonları</h2>
+                    <span class="badge">Dinamik Placeholder</span>
+                </div>
+                <p class="card-info">Aşağıdaki şablonlardan birini seçerek form alanlarının placeholder değerlerini otomatik olarak değiştirebilirsiniz.</p>
+                <div class="scenarios-grid" id="scenarios-container">
+                    <!-- Scenarios will be dynamically loaded here -->
+                    <div class="skeleton-loader" style="height: 60px;"></div>
+                </div>
+            </div>
+
+            <!-- 2. Form Card (Prompt Builder) -->
+            <form id="prompt-form" class="card form-card" autocomplete="off" novalidate>
+                <div class="card-header">
+                    <h2>📝 Prompt Bileşenleri</h2>
+                    <button type="button" class="btn-text" id="clear-form-btn">
+                        <span class="icon">🧹</span> Alanları Temizle
+                    </button>
+                </div>
+
+                <p class="form-info-note">ℹ️ Aşağıdaki alanları doldurmak zorunlu değildir. Boş bırakılan alanlarda hazır şablonun placeholder değerleri nihai prompt'a dahil edilecektir.</p>
+
+                <div class="form-grid">
+                    <!-- Row 1: Rol ve Ton -->
+                    <div class="form-group">
+                        <label for="input-rol">🤖 Yapay Zeka Rolü (Persona)</label>
+                        <input type="text" id="input-rol" name="Rol" placeholder="Örn: Senior Python & Veri Bilimi Geliştiricisi">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="input-ton">🎭 Cevap Tonu / Tarzı</label>
+                        <select id="input-ton" name="Ton" class="form-control combo-other-trigger">
+                            <option value="">Seçiniz...</option>
+                            <option value="Profesyonel, teknik ve çözüm odaklı">Profesyonel, teknik ve çözüm odaklı</option>
+                            <option value="Samimi, sıcak ve konuşma dilinde">Samimi, sıcak ve konuşma dilinde</option>
+                            <option value="Akademik, resmi ve analitik">Akademik, resmi ve analitik</option>
+                            <option value="Eğitici, açıklayıcı ve sabırlı">Eğitici, açıklayıcı ve sabırlı</option>
+                            <option value="İkna edici, pazarlama odaklı">İkna edici, pazarlama odaklı</option>
+                            <option value="Yaratıcı ve sanatsal">Yaratıcı ve sanatsal</option>
+                            <option value="diğer">Diğer...</option>
+                        </select>
+                        <input type="text" id="input-ton-diğer" class="form-control combo-other-input hidden" placeholder="Özel Cevap Tonu yazın">
+                    </div>
+
+                    <!-- Row 2: Hedef Kitle ve Çıktı Formatı -->
+                    <div class="form-group">
+                        <label for="input-hedefkitle">👥 Hedef Kitle</label>
+                        <input type="text" id="input-hedefkitle" name="Hedef Kitle" placeholder="Örn: Veri analitiği ekibi ve yazılım mimarları">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="input-format">📁 Çıktı Formatı / Türü</label>
+                        <select id="input-format" name="Format / Çıktı Türü" class="form-control combo-other-trigger">
+                            <option value="">Seçiniz...</option>
+                            <option value="Markdown (formatlı metin)">Markdown (formatlı metin)</option>
+                            <option value="JSON">JSON</option>
+                            <option value="Tablo">Tablo</option>
+                            <option value="Kod Bloğu">Kod Bloğu</option>
+                            <option value="Yönetici Özeti">Yönetici Özeti</option>
+                            <option value="diğer">Diğer...</option>
+                        </select>
+                        <input type="text" id="input-format-diğer" class="form-control combo-other-input hidden" placeholder="Özel Çıktı Formatı yazın">
+                    </div>
+
+                    <!-- Row 3: Uzunluk ve Kısıtlamalar -->
+                    <div class="form-group">
+                        <label for="input-uzunluk">📏 Uzunluk / Sınır</label>
+                        <input type="text" id="input-uzunluk" name="Uzunluk / Sınır" placeholder="Örn: Maksimum 3 paragraf açıklama ve kod bloğu">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="input-negatif">🚫 Negatif Kısıtlamalar (Neler Olmasın)</label>
+                        <input type="text" id="input-negatif" name="Negatif Kısıtlamalar / Neler Dahil Olmasın" placeholder="Örn: Spaghetti code olmasın, harici kütüphane kullanılmasın">
+                    </div>
+
+                    <!-- Row 4: Düşünme Stili ve Güven Seviyesi -->
+                    <div class="form-group">
+                        <label for="input-dusunme">🧠 Düşünme Stili</label>
+                        <select id="input-dusunme" name="Düşünme Stili" class="form-control combo-other-trigger">
+                            <option value="">Seçiniz...</option>
+                            <option value="Adım adım">Adım adım</option>
+                            <option value="İlk prensiplerden (first principles)">İlk prensiplerden (first principles)</option>
+                            <option value="Karşılaştırmalı">Karşılaştırmalı</option>
+                            <option value="Eleştirel">Eleştirel</option>
+                            <option value="Akademik">Akademik</option>
+                            <option value="diğer">Diğer...</option>
+                        </select>
+                        <input type="text" id="input-dusunme-diğer" class="form-control combo-other-input hidden" placeholder="Özel Düşünme Stili yazın">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="input-guven">🛡️ Güven Seviyesi</label>
+                        <select id="input-guven" name="Güven Seviyesi" class="form-control combo-other-trigger">
+                            <option value="">Seçiniz...</option>
+                            <option value="Emin olmadığın yerleri belirt">Emin olmadığın yerleri belirt</option>
+                            <option value="Varsayımlarını listele">Varsayımlarını listele</option>
+                            <option value="Kaynak göster">Kaynak göster</option>
+                            <option value="diğer">Diğer...</option>
+                        </select>
+                        <input type="text" id="input-guven-diğer" class="form-control combo-other-input hidden" placeholder="Özel Güven Seviyesi yazın">
+                    </div>
+
+                    <!-- Row 5: Çözüm Modu ve Temperature Slider -->
+                    <div class="form-group">
+                        <label for="input-cozum">🛠️ Çözüm Modu</label>
+                        <select id="input-cozum" name="Çözüm Modu" class="form-control combo-other-trigger">
+                            <option value="">Seçiniz...</option>
+                            <option value="Tek öneri ver">Tek öneri ver</option>
+                            <option value="Birkaç alternatif ver">Birkaç alternatif ver</option>
+                            <option value="Artı/eksi analizi yap">Artı/eksi analizi yap</option>
+                            <option value="diğer">Diğer...</option>
+                        </select>
+                        <input type="text" id="input-cozum-diğer" class="form-control combo-other-input hidden" placeholder="Özel Çözüm Modu yazın">
+                    </div>
+
+                    <div class="form-group slider-group">
+                        <div class="slider-header">
+                            <label for="input-temperature">🔥 Yaratıcılık Seviyesi (Temperature)</label>
+                            <span class="slider-value" id="temp-value">0.2</span>
+                        </div>
+                        <input type="range" id="input-temperature" name="Yaratıcılık Seviyesi (Temperature)" min="0" max="1" step="0.1" value="0.2">
+                        <span class="slider-hint" id="temp-hint">Düşük değerler daha tutarlı ve kesin sonuçlar üretir.</span>
+                    </div>
+
+                    <!-- Row 6: Bağlam (Full Width) - Placed right above the main prompt! -->
+                    <div class="form-group col-span-2">
+                        <label for="input-baglam">🌐 Bağlam / Arka Plan Bilgisi (Context)</label>
+                        <textarea id="input-baglam" name="Bağlam" rows="3" placeholder="Örn: Fedora Linux kullanıyorum. Docker üzerinde PostgreSQL veritabanım var. Bellek optimizasyonuna ihtiyacım var."></textarea>
+                    </div>
+
+                    <!-- Row 7: Ana Prompt (Full Width) -->
+                    <div class="form-group col-span-2 highlight-group">
+                        <label for="input-prompt">💡 Ana İstek / Görev (Prompt)</label>
+                        <textarea id="input-prompt" name="Ana Prompt" rows="4" required placeholder="Örn: Pandas DataFrame üzerinde bellek kullanımını azaltacak en verimli yöntemleri kod örneğiyle göster."></textarea>
+                    </div>
+                </div>
+            </form>
+
+            <!-- 3. Compiled Prompt & Runner Card -->
+            <div class="card result-card">
+                <div class="card-header">
+                    <h2>⚡ Nihai Prompt & Canlı Önizleme</h2>
+                </div>
+
+                <div class="preview-options">
+                    <label class="toggle-container">
+                        <input type="checkbox" id="use-placeholder-fallback">
+                        <span class="toggle-slider"></span>
+                        <span class="toggle-label">Boş alanlarda hazır şablonun placeholder'larını kullan</span>
+                    </label>
+                </div>
+
+                <div class="preview-box-container">
+                    <pre id="compiled-prompt-preview" class="preview-text"></pre>
+                </div>
+
+                <div class="action-buttons">
+                    <button type="button" class="btn btn-secondary" id="btn-copy-prompt">
+                        <span class="icon">📋</span> Kopyala
+                    </button>
+                    <div class="tooltip-wrapper" data-tooltip="Doğrudan çalıştırmak için sağ üstteki ⚙️ butonundan API anahtarınızı girin.">
+                        <button type="button" class="btn btn-accent w-full" id="btn-run-prompt" disabled>
+                            <span class="icon">🚀</span> Doğrudan Çalıştır
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 4. Output Panel -->
+            <div class="card output-card hidden" id="output-panel">
+                <div class="card-header">
+                    <h2>🤖 Yapay Zeka Yanıtı</h2>
+                    <button type="button" class="btn-text" id="btn-copy-output">
+                        <span class="icon">📋</span> Yanıtı Kopyala
+                    </button>
+                </div>
+                <div class="output-content-wrapper">
+                    <!-- Loader -->
+                    <div class="skeleton-loader-container hidden" id="output-loader">
+                        <div class="skeleton-line" style="width: 80%;"></div>
+                        <div class="skeleton-line" style="width: 95%;"></div>
+                        <div class="skeleton-line" style="width: 60%;"></div>
+                        <div class="skeleton-line" style="width: 85%;"></div>
+                    </div>
+                    <!-- Markdown Output -->
+                    <div id="output-text" class="output-markdown"></div>
+                </div>
+            </div>
+
+        </main>
+        
+        <!-- Footer / Disclaimer -->
+        <footer class="app-footer" id="disclaimer">
+            <p>© 2026 Promptmatik. Tüm hakları saklıdır.</p>
+            <p class="disclaimer-text">
+                <strong>Sorumluluk Reddi (Disclaimer):</strong> Bu web sitesi, kullanıcıların kendi API anahtarlarını kullanarak yapay zeka modelleriyle iletişim kurmasını sağlayan açık kaynaklı bir arayüzdür. Kullanıcıların ürettiği, sorguladığı veya paylaştığı içeriklerden, bu içeriklerin doğruluğundan veya doğurabileceği yasal sonuçlardan web sitesi sağlayıcısı sorumlu tutulamaz. Tüm sorumluluk son kullanıcıya ve kullanılan API anahtarının sahibine aittir.
+            </p>
+        </footer>
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <script type="module" src="/app.js"></script>
+</body>
+</html>
