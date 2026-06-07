@@ -19,12 +19,12 @@ const state = {
 
 // Dynamically loaded models from OpenRouter (pre-loaded with fallbacks)
 let openRouterModels = [
-    { id: 'google/gemini-1.5-flash', name: 'Google: Gemini 1.5 Flash' },
-    { id: 'google/gemini-1.5-pro', name: 'Google: Gemini 1.5 Pro' },
-    { id: 'openai/gpt-4o-mini', name: 'OpenAI: GPT-4o Mini' },
-    { id: 'openai/gpt-4o', name: 'OpenAI: GPT-4o' },
-    { id: 'deepseek/deepseek-chat', name: 'Deepseek: Deepseek V3' },
-    { id: 'anthropic/claude-3-5-sonnet', name: 'Anthropic: Claude 3.5 Sonnet' }
+    { id: 'google/gemini-1.5-flash', name: 'Google: Gemini 1.5 Flash', description: 'Hızlı ve ekonomik multimedya analizi ve genel görev modeli.' },
+    { id: 'google/gemini-1.5-pro', name: 'Google: Gemini 1.5 Pro', description: 'Karmaşık mantık yürütme ve büyük bağlam pencereleri için yüksek performanslı model.' },
+    { id: 'openai/gpt-4o-mini', name: 'OpenAI: GPT-4o Mini', description: 'OpenAI\'ın hızlı, hafif ve düşük maliyetli akıllı modeli.' },
+    { id: 'openai/gpt-4o', name: 'OpenAI: GPT-4o', description: 'OpenAI\'ın en gelişmiş, çok yönlü amiral gemisi yapay zeka modeli.' },
+    { id: 'deepseek/deepseek-chat', name: 'Deepseek: Deepseek V3', description: 'DeepSeek V3. Yüksek kaliteli, hızlı ve son derece ekonomik kodlama ve metin modeli.' },
+    { id: 'anthropic/claude-3-5-sonnet', name: 'Anthropic: Claude 3.5 Sonnet', description: 'Anthropic\'in kod yazma, analiz ve yaratıcı içerik üretiminde lider amiral gemisi modeli.' }
 ];
 
 // DOM Elements
@@ -120,6 +120,59 @@ function getApiUrl(provider, directUrl) {
         default:
             return directUrl;
     }
+}
+
+function updateModelDescription(selectEl, descElId) {
+    const descEl = document.getElementById(descElId);
+    if (!descEl) return;
+    
+    const selectedId = selectEl.value;
+    const model = openRouterModels.find(m => m.id === selectedId);
+    descEl.textContent = model && model.description ? model.description : '';
+}
+
+const funnyTexts = [
+    "Transistörler hizalanıyor...",
+    "Elektronlar denetimden geçiyor...",
+    "Bitler ikişer ikişer sıraya giriyor...",
+    "Yapay zekanın kahvesi demleniyor...",
+    "Nöronlar arasında köprüler kuruluyor...",
+    "Prompt bileşenleri potada eritiliyor...",
+    "Gereksiz kelimeler ayıklanıyor...",
+    "Veri merkezindeki fanlar hızlanıyor...",
+    "Modelin uykusu açılıyor...",
+    "Kuantum dolanıklık ayarlanıyor...",
+    "Evrendeki tüm veriler taranıyor...",
+    "Cevap matrisi optimize ediliyor...",
+    "Promptmatik motoru tam gaz çalışıyor...",
+    "Sunuculara tatlı dille istek yapılıyor...",
+    "Mantık çipleri ısınmaya başladı..."
+];
+
+let funnyTextInterval = null;
+
+function startFunnyLoader() {
+    clearInterval(funnyTextInterval);
+    const loaderTextEl = document.getElementById('loader-funny-text');
+    if (!loaderTextEl) return;
+    
+    // Pick a random one to start
+    loaderTextEl.textContent = funnyTexts[Math.floor(Math.random() * funnyTexts.length)];
+    
+    funnyTextInterval = setInterval(() => {
+        let currentText = loaderTextEl.textContent;
+        let nextText = currentText;
+        while (nextText === currentText) {
+            nextText = funnyTexts[Math.floor(Math.random() * funnyTexts.length)];
+        }
+        loaderTextEl.textContent = nextText;
+    }, 2500);
+}
+
+function stopFunnyLoader() {
+    clearInterval(funnyTextInterval);
+    const loaderTextEl = document.getElementById('loader-funny-text');
+    if (loaderTextEl) loaderTextEl.textContent = '';
 }
 
 // --------------------------------------------------
@@ -448,6 +501,7 @@ function updateUnlockedModelOptions(provider) {
                 opt.value = m.id;
                 const displayName = m.name.includes(':') ? m.name.split(':')[1].trim() : m.name;
                 opt.textContent = displayName;
+                if (m.description) opt.title = m.description;
                 groupEl.appendChild(opt);
             });
             els.unlockedModelSelect.appendChild(groupEl);
@@ -470,6 +524,7 @@ function updateUnlockedModelOptions(provider) {
                 opt.value = m.id;
                 const displayName = m.name.includes(':') ? m.name.split(':')[1].trim() : m.name;
                 opt.textContent = displayName;
+                if (m.description) opt.title = m.description;
                 groupEl.appendChild(opt);
             });
             els.unlockedModelSelect.appendChild(groupEl);
@@ -482,6 +537,7 @@ function updateUnlockedModelOptions(provider) {
             opt.value = m.id;
             const displayName = m.name.includes(':') ? m.name.split(':')[1].trim() : m.name;
             opt.textContent = displayName;
+            if (m.description) opt.title = m.description;
             els.unlockedModelSelect.appendChild(opt);
         });
     }
@@ -491,6 +547,9 @@ function updateUnlockedModelOptions(provider) {
     if (savedModel) {
         els.unlockedModelSelect.value = savedModel;
     }
+    
+    // Update active model description label
+    updateModelDescription(els.unlockedModelSelect, 'unlocked-model-desc');
 }
 
 function getProviderName(modelId) {
@@ -552,6 +611,7 @@ function updateModelOptions() {
                 opt.value = m.id;
                 const displayName = m.name.includes(':') ? m.name.split(':')[1].trim() : m.name;
                 opt.textContent = displayName;
+                if (m.description) opt.title = m.description;
                 groupEl.appendChild(opt);
             });
             els.apiModel.appendChild(groupEl);
@@ -574,6 +634,7 @@ function updateModelOptions() {
                 opt.value = m.id;
                 const displayName = m.name.includes(':') ? m.name.split(':')[1].trim() : m.name;
                 opt.textContent = displayName;
+                if (m.description) opt.title = m.description;
                 groupEl.appendChild(opt);
             });
             els.apiModel.appendChild(groupEl);
@@ -586,6 +647,7 @@ function updateModelOptions() {
             opt.value = m.id;
             const displayName = m.name.includes(':') ? m.name.split(':')[1].trim() : m.name;
             opt.textContent = displayName;
+            if (m.description) opt.title = m.description;
             els.apiModel.appendChild(opt);
         });
     }
@@ -595,6 +657,9 @@ function updateModelOptions() {
     if (savedModel) {
         els.apiModel.value = savedModel;
     }
+    
+    // Update setup model description label
+    updateModelDescription(els.apiModel, 'api-model-desc');
 }
 
 function saveEncryptedKey() {
@@ -712,13 +777,94 @@ async function runAPIRequest() {
     // Scroll output into view smoothly
     els.outputPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
+    startFunnyLoader();
+
     const temperature = parseFloat(els.temperature.value);
     let model = localStorage.getItem(`selected_model_${provider}`);
 
     try {
         let aiResponse = '';
         
-        if (provider === 'gemini') {
+        if (provider === 'openai' || provider === 'deepseek' || provider === 'openrouter') {
+            let modelId = model;
+            let targetUrl = '';
+            
+            if (provider === 'openai') {
+                if (!modelId) modelId = 'openai/gpt-4o-mini';
+                const cleanModel = modelId.replace('openai/', '');
+                targetUrl = getApiUrl('openai', 'https://api.openai.com/v1/chat/completions');
+                modelId = cleanModel;
+            } else if (provider === 'deepseek') {
+                if (!modelId) modelId = 'deepseek/deepseek-chat';
+                const cleanModel = modelId.replace('deepseek/', '');
+                targetUrl = getApiUrl('deepseek', 'https://api.deepseek.com/chat/completions');
+                modelId = cleanModel;
+            } else if (provider === 'openrouter') {
+                if (!modelId) modelId = 'google/gemini-1.5-flash';
+                targetUrl = getApiUrl('openrouter', 'https://openrouter.ai/api/v1/chat/completions');
+            }
+
+            const response = await fetch(targetUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${key}`
+                },
+                body: JSON.stringify({
+                    model: modelId,
+                    messages: [{ role: 'user', content: promptText }],
+                    temperature: temperature,
+                    stream: true
+                })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                const errMsg = errorData.error?.message || `${provider.toUpperCase()} API hatası (Durum: ${response.status})`;
+                throw new Error(errMsg);
+            }
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder('utf-8');
+            let buffer = '';
+            let firstChunk = true;
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop(); // Keep partial line in buffer
+
+                for (const line of lines) {
+                    const cleanLine = line.trim();
+                    if (!cleanLine) continue;
+                    if (cleanLine.startsWith('data: ')) {
+                        const dataStr = cleanLine.slice(6).trim();
+                        if (dataStr === '[DONE]') {
+                            break;
+                        }
+                        try {
+                            const parsed = JSON.parse(dataStr);
+                            const chunkText = parsed.choices?.[0]?.delta?.content || '';
+                            if (chunkText) {
+                                if (firstChunk) {
+                                    firstChunk = false;
+                                    els.outputLoader.classList.add('hidden');
+                                    stopFunnyLoader();
+                                }
+                                aiResponse += chunkText;
+                                els.outputText.innerHTML = marked.parse(aiResponse);
+                            }
+                        } catch (e) {
+                            // Ignore malformed JSON chunks
+                        }
+                    }
+                }
+            }
+
+        } else if (provider === 'gemini') {
             if (!model) model = 'google/gemini-1.5-flash';
             const cleanModel = model.replace('google/', '');
             const url = getApiUrl('gemini', `https://generativelanguage.googleapis.com/v1beta/models/${cleanModel}:generateContent?key=${key}`);
@@ -741,58 +887,7 @@ async function runAPIRequest() {
 
             const data = await response.json();
             aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || 'Yapay zekadan boş yanıt döndü.';
-            
-        } else if (provider === 'openai') {
-            if (!model) model = 'openai/gpt-4o-mini';
-            const cleanModel = model.replace('openai/', '');
-            const url = getApiUrl('openai', 'https://api.openai.com/v1/chat/completions');
-            
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${key}`
-                },
-                body: JSON.stringify({
-                    model: cleanModel,
-                    messages: [{ role: 'user', content: promptText }],
-                    temperature: temperature
-                })
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.error?.message || `OpenAI API hatası (Durum: ${response.status})`);
-            }
-
-            const data = await response.json();
-            aiResponse = data.choices?.[0]?.message?.content || 'Yapay zekadan boş yanıt döndü.';
-            
-        } else if (provider === 'deepseek') {
-            if (!model) model = 'deepseek/deepseek-chat';
-            const cleanModel = model.replace('deepseek/', '');
-            const url = getApiUrl('deepseek', 'https://api.deepseek.com/chat/completions');
-            
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${key}`
-                },
-                body: JSON.stringify({
-                    model: cleanModel,
-                    messages: [{ role: 'user', content: promptText }],
-                    temperature: temperature
-                })
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.error?.message || `Deepseek API hatası (Durum: ${response.status})`);
-            }
-
-            const data = await response.json();
-            aiResponse = data.choices?.[0]?.message?.content || 'Yapay zekadan boş yanıt döndü.';
+            els.outputText.innerHTML = marked.parse(aiResponse);
             
         } else if (provider === 'anthropic') {
             if (!model) model = 'anthropic/claude-3-5-sonnet';
@@ -822,31 +917,7 @@ async function runAPIRequest() {
 
             const data = await response.json();
             aiResponse = data.content?.[0]?.text || 'Yapay zekadan boş yanıt döndü.';
-            
-        } else if (provider === 'openrouter') {
-            if (!model) model = 'google/gemini-1.5-flash';
-            const url = getApiUrl('openrouter', 'https://openrouter.ai/api/v1/chat/completions');
-            
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${key}`
-                },
-                body: JSON.stringify({
-                    model: model,
-                    messages: [{ role: 'user', content: promptText }],
-                    temperature: temperature
-                })
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.error?.message || `OpenRouter API hatası (Durum: ${response.status})`);
-            }
-
-            const data = await response.json();
-            aiResponse = data.choices?.[0]?.message?.content || 'Yapay zekadan boş yanıt döndü.';
+            els.outputText.innerHTML = marked.parse(aiResponse);
         }
 
         // Render response using marked.js
@@ -881,6 +952,7 @@ async function runAPIRequest() {
         showToast('İstek başarısız oldu.', 'error');
     } finally {
         els.outputLoader.classList.add('hidden');
+        stopFunnyLoader();
     }
 }
 
@@ -957,7 +1029,12 @@ function setupEventListeners() {
     els.unlockedModelSelect.addEventListener('change', (e) => {
         const model = e.target.value;
         localStorage.setItem(`selected_model_${state.currentProvider}`, model);
+        updateModelDescription(els.unlockedModelSelect, 'unlocked-model-desc');
         showToast('Aktif model güncellendi.', 'success', 1500);
+    });
+
+    els.apiModel.addEventListener('change', () => {
+        updateModelDescription(els.apiModel, 'api-model-desc');
     });
 
     els.btnShowSetup.addEventListener('click', () => {
@@ -1049,7 +1126,9 @@ async function fetchOpenRouterModels() {
             const allowedPrefixes = ['openai', 'google', 'anthropic', 'deepseek', 'meta-llama', 'meta', 'mistralai', 'cohere', 'microsoft'];
             openRouterModels = data.data.filter(m => {
                 const prefix = m.id.split('/')[0];
-                return allowedPrefixes.includes(prefix);
+                const isAllowedPrefix = allowedPrefixes.includes(prefix);
+                const isActive = !m.expiration_date; // expiration_date null veya undefined olmalı
+                return isAllowedPrefix && isActive;
             });
             localStorage.setItem('cached_models', JSON.stringify(openRouterModels));
         }
