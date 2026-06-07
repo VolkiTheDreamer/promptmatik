@@ -1278,3 +1278,110 @@ input[type="range"]::-webkit-slider-thumb:hover {
     }
 }
 
+/* Switch Toggle & Slider CSS */
+.switch-toggle input:checked + .slider-toggle {
+    background-color: var(--accent-gemini-secondary) !important;
+}
+
+.slider-toggle::before {
+    content: "";
+    position: absolute;
+    height: 16px;
+    width: 16px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: .3s;
+    border-radius: 50%;
+}
+
+.switch-toggle input:checked + .slider-toggle::before {
+    transform: translateX(20px);
+}
+
+/* Tool Call Simulation Cards */
+.tool-call-card {
+    background: rgba(245, 158, 11, 0.05);
+    border: 1px solid rgba(245, 158, 11, 0.25);
+    border-radius: var(--radius-md);
+    padding: 1.25rem;
+    margin-block: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    animation: slideDown 0.3s ease-out;
+}
+
+.tool-call-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 600;
+    color: var(--accent-warning);
+    font-size: 0.95rem;
+}
+
+.tool-call-name {
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    background: rgba(245, 158, 11, 0.15);
+    padding: 0.2rem 0.4rem;
+    border-radius: 4px;
+    font-size: 0.9rem;
+}
+
+.tool-call-args {
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 0.8rem;
+    background: rgba(0, 0, 0, 0.25);
+    padding: 0.75rem;
+    border-radius: var(--radius-sm);
+    color: #e2e8f0;
+    white-space: pre-wrap;
+    max-height: 150px;
+    overflow-y: auto;
+}
+
+.tool-response-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.tool-response-label {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+.tool-response-input {
+    min-height: 40px !important;
+    font-family: monospace;
+    font-size: 0.85rem;
+}
+
+.btn-tool-submit {
+    align-self: flex-end;
+    min-height: 38px !important;
+    padding: 0.5rem 1rem !important;
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%) !important;
+    color: white !important;
+    box-shadow: 0 4px 10px rgba(245, 158, 11, 0.2) !important;
+}
+
+.btn-tool-submit:hover {
+    box-shadow: 0 6px 15px rgba(245, 158, 11, 0.3) !important;
+    transform: translateY(-1px);
+}
+
+/* Light Theme Overrides for Tool Call Card */
+:root.light-theme .tool-call-card {
+    background: rgba(245, 158, 11, 0.03);
+    border-color: rgba(245, 158, 11, 0.3);
+}
+
+:root.light-theme .tool-call-args {
+    background: rgba(0, 0, 0, 0.05);
+    color: #1e293b;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+}
+

@@ -94,8 +94,168 @@ const els = {
     themeToggle: document.getElementById('theme-toggle'),
     apiSettingsToggle: document.getElementById('api-settings-toggle'),
     apiSettingsDialog: document.getElementById('api-settings-dialog'),
-    btnCloseApiDialog: document.getElementById('btn-close-api-dialog')
+    btnCloseApiDialog: document.getElementById('btn-close-api-dialog'),
+    
+    // Tools / Function Calling Elements
+    enableTools: document.getElementById('enable-tools'),
+    toolsToggleHeader: document.getElementById('tools-toggle-header'),
+    toolsContent: document.getElementById('tools-content'),
+    selectPrebuiltTool: document.getElementById('select-prebuilt-tool'),
+    customToolSchemaGroup: document.getElementById('custom-tool-schema-group'),
+    customToolSchema: document.getElementById('custom-tool-schema')
 };
+
+// --------------------------------------------------
+// 0.0. Tools / Function Calling Configurations & Helpers
+// --------------------------------------------------
+const prebuiltTools = {
+    weather: {
+        name: "get_current_weather",
+        description: "Belirli bir konum için anlık hava durumu bilgisini getirir.",
+        parameters: {
+            type: "object",
+            properties: {
+                location: {
+                    type: "string",
+                    description: "İl, ilçe veya şehir adı, örn: Istanbul, Ankara"
+                },
+                unit: {
+                    type: "string",
+                    enum: ["celsius", "fahrenheit"],
+                    description: "Sıcaklık birimi"
+                }
+            },
+            required: ["location"]
+        }
+    },
+    web_search: {
+        name: "web_search",
+        description: "İnternet üzerinde arama yaparak güncel bilgileri getirir.",
+        parameters: {
+            type: "object",
+            properties: {
+                query: {
+                    type: "string",
+                    description: "Aranacak kelimeler veya arama sorgusu"
+                }
+            },
+            required: ["query"]
+        }
+    },
+    calculator: {
+        name: "calculator",
+        description: "Matematiksel işlemleri ve karmaşık hesaplamaları yapar.",
+        parameters: {
+            type: "object",
+            properties: {
+                expression: {
+                    type: "string",
+                    description: "Hesaplanacak matematiksel ifade, örn: (23 + 45) * 1.5"
+                }
+            },
+            required: ["expression"]
+        }
+    }
+};
+
+function convertTypesToUppercase(obj) {
+    if (!obj || typeof obj !== 'object') return;
+    if (obj.type && typeof obj.type === 'string') {
+        obj.type = obj.type.toUpperCase();
+    }
+    if (obj.properties) {
+        for (const key in obj.properties) {
+            convertTypesToUppercase(obj.properties[key]);
+        }
+    }
+    if (obj.items) {
+        convertTypesToUppercase(obj.items);
+    }
+}
+
+function getToolsPayload(provider) {
+    if (!els.enableTools.checked) return null;
+    
+    const schemaVal = els.customToolSchema.value.trim();
+    if (!schemaVal) return null;
+    
+    let parsedSchema;
+    try {
+        parsedSchema = JSON.parse(schemaVal);
+    } catch (e) {
+        showToast('Araç JSON Şeması geçersiz! Lütfen JSON formatını kontrol edin.', 'error');
+        throw new Error('Geçersiz JSON Şeması: ' + e.message);
+    }
+    
+    if (provider === 'openai' || provider === 'deepseek' || provider === 'openrouter') {
+        return [
+            {
+                type: "function",
+                function: parsedSchema
+            }
+        ];
+    } else if (provider === 'gemini') {
+        const clone = JSON.parse(JSON.stringify(parsedSchema));
+        if (clone.parameters) {
+            convertTypesToUppercase(clone.parameters);
+        }
+        return [
+            {
+                functionDeclarations: [clone]
+            }
+        ];
+    } else if (provider === 'anthropic') {
+        return [
+            {
+                name: parsedSchema.name,
+                description: parsedSchema.description,
+                input_schema: parsedSchema.parameters || { type: "object", properties: {} }
+            }
+        ];
+    }
+    return null;
+}
+
+function initToolsUI() {
+    els.toolsToggleHeader.addEventListener('click', (e) => {
+        if (e.target !== els.enableTools && !els.enableTools.contains(e.target) && !e.target.closest('.switch-toggle')) {
+            els.enableTools.checked = !els.enableTools.checked;
+            els.enableTools.dispatchEvent(new Event('change'));
+        }
+    });
+
+    els.enableTools.addEventListener('change', () => {
+        if (els.enableTools.checked) {
+            els.toolsContent.classList.remove('hidden');
+            showToast('Fonksiyon Çağırma (Tools) etkinleştirildi. İstekler akışsız (non-streaming) gönderilecek.', 'success', 2500);
+        } else {
+            els.toolsContent.classList.add('hidden');
+            showToast('Fonksiyon Çağırma (Tools) devre dışı bırakıldı.', 'warning', 2000);
+        }
+    });
+
+    els.selectPrebuiltTool.addEventListener('change', () => {
+        const val = els.selectPrebuiltTool.value;
+        if (val === 'custom') {
+            els.customToolSchemaGroup.classList.remove('hidden');
+            els.customToolSchema.readOnly = false;
+        } else {
+            const toolSchema = prebuiltTools[val];
+            if (toolSchema) {
+                els.customToolSchema.value = JSON.stringify(toolSchema, null, 2);
+                els.customToolSchema.readOnly = true;
+                els.customToolSchemaGroup.classList.remove('hidden');
+            }
+        }
+    });
+
+    const initialVal = els.selectPrebuiltTool.value;
+    if (initialVal && initialVal !== 'custom') {
+        els.customToolSchema.value = JSON.stringify(prebuiltTools[initialVal], null, 2);
+        els.customToolSchema.readOnly = true;
+    }
+}
+
 
 // --------------------------------------------------
 // 0. API Endpoint CORS Proxy Resolver for Local Development
@@ -782,6 +942,17 @@ async function runAPIRequest() {
     const temperature = parseFloat(els.temperature.value);
     let model = localStorage.getItem(`selected_model_${provider}`);
 
+    let toolsPayload = null;
+    if (els.enableTools.checked) {
+        try {
+            toolsPayload = getToolsPayload(provider);
+        } catch (err) {
+            els.outputLoader.classList.add('hidden');
+            stopFunnyLoader();
+            return;
+        }
+    }
+
     try {
         let aiResponse = '';
         
@@ -804,18 +975,26 @@ async function runAPIRequest() {
                 targetUrl = getApiUrl('openrouter', 'https://openrouter.ai/api/v1/chat/completions');
             }
 
+            const requestBody = {
+                model: modelId,
+                messages: [{ role: 'user', content: promptText }],
+                temperature: temperature
+            };
+
+            if (toolsPayload) {
+                requestBody.tools = toolsPayload;
+                requestBody.stream = false;
+            } else {
+                requestBody.stream = true;
+            }
+
             const response = await fetch(targetUrl, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${key}`
                 },
-                body: JSON.stringify({
-                    model: modelId,
-                    messages: [{ role: 'user', content: promptText }],
-                    temperature: temperature,
-                    stream: true
-                })
+                body: JSON.stringify(requestBody)
             });
 
             if (!response.ok) {
@@ -824,41 +1003,54 @@ async function runAPIRequest() {
                 throw new Error(errMsg);
             }
 
-            const reader = response.body.getReader();
-            const decoder = new TextDecoder('utf-8');
-            let buffer = '';
-            let firstChunk = true;
+            if (toolsPayload) {
+                const data = await response.json();
+                const toolCalls = data.choices?.[0]?.message?.tool_calls;
+                if (toolCalls && toolCalls.length > 0) {
+                    els.outputLoader.classList.add('hidden');
+                    stopFunnyLoader();
+                    renderToolCallUI(provider, modelId, key, temperature, promptText, toolCalls, data);
+                    return;
+                } else {
+                    aiResponse = data.choices?.[0]?.message?.content || 'Yapay zekadan boş yanıt döndü.';
+                }
+            } else {
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder('utf-8');
+                let buffer = '';
+                let firstChunk = true;
 
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
 
-                buffer += decoder.decode(value, { stream: true });
-                const lines = buffer.split('\n');
-                buffer = lines.pop(); // Keep partial line in buffer
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop();
 
-                for (const line of lines) {
-                    const cleanLine = line.trim();
-                    if (!cleanLine) continue;
-                    if (cleanLine.startsWith('data: ')) {
-                        const dataStr = cleanLine.slice(6).trim();
-                        if (dataStr === '[DONE]') {
-                            break;
-                        }
-                        try {
-                            const parsed = JSON.parse(dataStr);
-                            const chunkText = parsed.choices?.[0]?.delta?.content || '';
-                            if (chunkText) {
-                                if (firstChunk) {
-                                    firstChunk = false;
-                                    els.outputLoader.classList.add('hidden');
-                                    stopFunnyLoader();
-                                }
-                                aiResponse += chunkText;
-                                els.outputText.innerHTML = marked.parse(aiResponse);
+                    for (const line of lines) {
+                        const cleanLine = line.trim();
+                        if (!cleanLine) continue;
+                        if (cleanLine.startsWith('data: ')) {
+                            const dataStr = cleanLine.slice(6).trim();
+                            if (dataStr === '[DONE]') {
+                                break;
                             }
-                        } catch (e) {
-                            // Ignore malformed JSON chunks
+                            try {
+                                const parsed = JSON.parse(dataStr);
+                                const chunkText = parsed.choices?.[0]?.delta?.content || '';
+                                if (chunkText) {
+                                    if (firstChunk) {
+                                        firstChunk = false;
+                                        els.outputLoader.classList.add('hidden');
+                                        stopFunnyLoader();
+                                    }
+                                    aiResponse += chunkText;
+                                    els.outputText.innerHTML = marked.parse(aiResponse);
+                                }
+                            } catch (e) {
+                                // Ignore
+                            }
                         }
                     }
                 }
@@ -869,15 +1061,21 @@ async function runAPIRequest() {
             const cleanModel = model.replace('google/', '');
             const url = getApiUrl('gemini', `https://generativelanguage.googleapis.com/v1beta/models/${cleanModel}:generateContent?key=${key}`);
             
+            const requestBody = {
+                contents: [{ parts: [{ text: promptText }] }],
+                generationConfig: {
+                    temperature: temperature
+                }
+            };
+
+            if (toolsPayload) {
+                requestBody.tools = toolsPayload;
+            }
+
             const response = await fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [{ parts: [{ text: promptText }] }],
-                    generationConfig: {
-                        temperature: temperature
-                    }
-                })
+                body: JSON.stringify(requestBody)
             });
 
             if (!response.ok) {
@@ -886,14 +1084,34 @@ async function runAPIRequest() {
             }
 
             const data = await response.json();
-            aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || 'Yapay zekadan boş yanıt döndü.';
-            els.outputText.innerHTML = marked.parse(aiResponse);
+            const parts = data.candidates?.[0]?.content?.parts;
+            const hasFunctionCall = parts && parts.some(p => p.functionCall);
+            
+            if (hasFunctionCall) {
+                els.outputLoader.classList.add('hidden');
+                stopFunnyLoader();
+                renderToolCallUI(provider, model, key, temperature, promptText, parts.filter(p => p.functionCall), data);
+                return;
+            } else {
+                aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || 'Yapay zekadan boş yanıt döndü.';
+            }
             
         } else if (provider === 'anthropic') {
             if (!model) model = 'anthropic/claude-3-5-sonnet';
             const cleanModel = model.replace('anthropic/', '');
             const url = getApiUrl('anthropic', 'https://api.anthropic.com/v1/messages');
             
+            const requestBody = {
+                model: cleanModel,
+                messages: [{ role: 'user', content: promptText }],
+                max_tokens: 4096,
+                temperature: temperature
+            };
+
+            if (toolsPayload) {
+                requestBody.tools = toolsPayload;
+            }
+
             const response = await fetch(url, {
                 method: 'POST',
                 headers: {
@@ -902,12 +1120,7 @@ async function runAPIRequest() {
                     'anthropic-version': '2023-06-01',
                     'dangerously-allow-browser': 'true'
                 },
-                body: JSON.stringify({
-                    model: cleanModel,
-                    messages: [{ role: 'user', content: promptText }],
-                    max_tokens: 4096,
-                    temperature: temperature
-                })
+                body: JSON.stringify(requestBody)
             });
 
             if (!response.ok) {
@@ -916,8 +1129,16 @@ async function runAPIRequest() {
             }
 
             const data = await response.json();
-            aiResponse = data.content?.[0]?.text || 'Yapay zekadan boş yanıt döndü.';
-            els.outputText.innerHTML = marked.parse(aiResponse);
+            const toolUseBlocks = data.content?.filter(c => c.type === 'tool_use');
+            
+            if (toolUseBlocks && toolUseBlocks.length > 0) {
+                els.outputLoader.classList.add('hidden');
+                stopFunnyLoader();
+                renderToolCallUI(provider, model, key, temperature, promptText, toolUseBlocks, data);
+                return;
+            } else {
+                aiResponse = data.content?.find(c => c.type === 'text')?.text || data.content?.[0]?.text || 'Yapay zekadan boş yanıt döndü.';
+            }
         }
 
         // Render response using marked.js
@@ -955,6 +1176,275 @@ async function runAPIRequest() {
         stopFunnyLoader();
     }
 }
+function getToolResponse(toolCall, idx, provider, asString = false) {
+    let inputVal = document.getElementById(`tool-response-${idx}`).value.trim();
+    if (!inputVal) {
+        let name = '';
+        if (provider === 'openai' || provider === 'deepseek' || provider === 'openrouter') {
+            name = toolCall.function.name;
+        } else if (provider === 'gemini') {
+            name = toolCall.functionCall.name;
+        } else if (provider === 'anthropic') {
+            name = toolCall.name;
+        }
+        
+        if (name === 'get_current_weather') {
+            inputVal = '{"temperature": 24, "condition": "Güneşli"}';
+        } else if (name === 'web_search') {
+            inputVal = '{"results": "Simüle edilmiş güncel internet bilgisi."}';
+        } else if (name === 'calculator') {
+            inputVal = '{"result": 42}';
+        } else {
+            inputVal = '{"result": "success"}';
+        }
+    }
+    
+    if (asString) {
+        return inputVal;
+    }
+    
+    try {
+        return JSON.parse(inputVal);
+    } catch (e) {
+        return { result: inputVal };
+    }
+}
+
+function renderToolCallUI(provider, modelId, key, temperature, promptText, toolCalls, originalResponseData) {
+    els.outputText.innerHTML = '';
+    
+    const container = document.createElement('div');
+    container.className = 'tool-calls-container';
+    
+    const title = document.createElement('h3');
+    title.style.margin = '0 0 1rem 0';
+    title.style.color = 'var(--accent-warning)';
+    title.innerHTML = '🔌 Model Araç Çağırmak İstiyor (Simülasyon)';
+    container.appendChild(title);
+    
+    toolCalls.forEach((toolCall, idx) => {
+        let name = '';
+        let argsStr = '';
+        
+        if (provider === 'openai' || provider === 'deepseek' || provider === 'openrouter') {
+            name = toolCall.function.name;
+            argsStr = toolCall.function.arguments;
+        } else if (provider === 'gemini') {
+            name = toolCall.functionCall.name;
+            argsStr = JSON.stringify(toolCall.functionCall.args, null, 2);
+        } else if (provider === 'anthropic') {
+            name = toolCall.name;
+            argsStr = JSON.stringify(toolCall.input, null, 2);
+        }
+        
+        try {
+            const parsed = JSON.parse(argsStr);
+            argsStr = JSON.stringify(parsed, null, 2);
+        } catch (e) {
+            // Keep original
+        }
+        
+        const card = document.createElement('div');
+        card.className = 'tool-call-card';
+        
+        card.innerHTML = `
+            <div class="tool-call-header">
+                <span>🛠️ Araç Çağrısı #${idx + 1}:</span>
+                <span class="tool-call-name">${name}</span>
+            </div>
+            <div class="tool-response-label">Parametreler:</div>
+            <pre class="tool-call-args">${argsStr}</pre>
+            <div class="tool-response-form">
+                <label class="tool-response-label" for="tool-response-${idx}">Simüle Edilen Araç Yanıtı (JSON veya Metin):</label>
+                <input type="text" id="tool-response-${idx}" class="form-control tool-response-input" placeholder='Örn: {"temperature": 24, "condition": "Güneşli"}'>
+            </div>
+        `;
+        
+        container.appendChild(card);
+    });
+    
+    const btnSubmit = document.createElement('button');
+    btnSubmit.type = 'button';
+    btnSubmit.className = 'btn btn-tool-submit';
+    btnSubmit.innerHTML = '⚡ Cevabı Gönder & Devam Et';
+    container.appendChild(btnSubmit);
+    
+    els.outputText.appendChild(container);
+    
+    btnSubmit.addEventListener('click', async () => {
+        els.outputLoader.classList.remove('hidden');
+        startFunnyLoader();
+        btnSubmit.disabled = true;
+        
+        try {
+            let finalResponseText = '';
+            
+            if (provider === 'openai' || provider === 'deepseek' || provider === 'openrouter') {
+                const secondMessages = [
+                    { role: 'user', content: promptText },
+                    { 
+                        role: 'assistant', 
+                        content: originalResponseData.choices[0].message.content || null,
+                        tool_calls: originalResponseData.choices[0].message.tool_calls 
+                    }
+                ];
+                
+                toolCalls.forEach((toolCall, idx) => {
+                    const parsedResponse = getToolResponse(toolCall, idx, provider, false);
+                    secondMessages.push({
+                        role: 'tool',
+                        tool_call_id: toolCall.id,
+                        name: toolCall.function.name,
+                        content: JSON.stringify(parsedResponse)
+                    });
+                });
+                
+                let targetUrl = '';
+                let cleanModel = modelId;
+                if (provider === 'openai') {
+                    cleanModel = modelId.replace('openai/', '');
+                    targetUrl = getApiUrl('openai', 'https://api.openai.com/v1/chat/completions');
+                } else if (provider === 'deepseek') {
+                    cleanModel = modelId.replace('deepseek/', '');
+                    targetUrl = getApiUrl('deepseek', 'https://api.deepseek.com/chat/completions');
+                } else if (provider === 'openrouter') {
+                    targetUrl = getApiUrl('openrouter', 'https://openrouter.ai/api/v1/chat/completions');
+                }
+                
+                const response = await fetch(targetUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${key}`
+                    },
+                    body: JSON.stringify({
+                        model: cleanModel,
+                        messages: secondMessages,
+                        temperature: temperature,
+                        stream: false
+                    })
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.error?.message || `API hatası (Durum: ${response.status})`);
+                }
+                
+                const data = await response.json();
+                finalResponseText = data.choices?.[0]?.message?.content || 'Yapay zekadan boş yanıt döndü.';
+                
+            } else if (provider === 'gemini') {
+                const secondContents = [
+                    { role: 'user', parts: [{ text: promptText }] },
+                    { role: 'model', parts: originalResponseData.candidates[0].content.parts }
+                ];
+                
+                const functionResponseParts = [];
+                toolCalls.forEach((toolCall, idx) => {
+                    const parsedResponse = getToolResponse(toolCall, idx, provider, false);
+                    functionResponseParts.push({
+                        functionResponse: {
+                            name: toolCall.functionCall.name,
+                            response: parsedResponse
+                        }
+                    });
+                });
+                
+                secondContents.push({
+                    role: 'function',
+                    parts: functionResponseParts
+                });
+                
+                const cleanModel = modelId.replace('google/', '');
+                const url = getApiUrl('gemini', `https://generativelanguage.googleapis.com/v1beta/models/${cleanModel}:generateContent?key=${key}`);
+                
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: secondContents,
+                        generationConfig: {
+                            temperature: temperature
+                        }
+                    })
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.error?.message || `Gemini API hatası (Durum: ${response.status})`);
+                }
+                
+                const data = await response.json();
+                finalResponseText = data.candidates?.[0]?.content?.parts?.[0]?.text || 'Yapay zekadan boş yanıt döndü.';
+                
+            } else if (provider === 'anthropic') {
+                const secondMessages = [
+                    { role: 'user', content: promptText },
+                    { role: 'assistant', content: originalResponseData.content }
+                ];
+                
+                const toolResultParts = [];
+                toolCalls.forEach((toolCall, idx) => {
+                    const stringResponse = getToolResponse(toolCall, idx, provider, true);
+                    toolResultParts.push({
+                        type: 'tool_result',
+                        tool_use_id: toolCall.id,
+                        content: stringResponse
+                    });
+                });
+                
+                secondMessages.push({
+                    role: 'user',
+                    content: toolResultParts
+                });
+                
+                const cleanModel = modelId.replace('anthropic/', '');
+                const url = getApiUrl('anthropic', 'https://api.anthropic.com/v1/messages');
+                
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-api-key': key,
+                        'anthropic-version': '2023-06-01',
+                        'dangerously-allow-browser': 'true'
+                    },
+                    body: JSON.stringify({
+                        model: cleanModel,
+                        messages: secondMessages,
+                        max_tokens: 4096,
+                        temperature: temperature
+                    })
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.error?.message || `Anthropic API hatası (Durum: ${response.status})`);
+                }
+                
+                const data = await response.json();
+                finalResponseText = data.content?.[0]?.text || 'Yapay zekadan boş yanıt döndü.';
+            }
+            
+            els.outputText.innerHTML = marked.parse(finalResponseText);
+            showToast('Simüle edilmiş araç yanıtı işlendi ve nihai cevap alındı.', 'success');
+            
+        } catch (err) {
+            console.error(err);
+            els.outputText.innerHTML = `
+                <div style="border-left: 4px solid var(--accent-error); background: rgba(239, 68, 68, 0.08); padding: 1rem; border-radius: 4px; margin-top: 1rem;">
+                    <h4 style="color: var(--accent-error); margin-bottom: 0.5rem; font-weight: 600;">Hata Oluştu! (2. Aşama)</h4>
+                    <p style="font-size: 0.9rem; color: var(--text-secondary);">${err.message}</p>
+                </div>
+            `;
+            showToast('İkinci aşama başarısız oldu.', 'error');
+        } finally {
+            els.outputLoader.classList.add('hidden');
+            stopFunnyLoader();
+        }
+    });
+}
+
 
 // --------------------------------------------------
 // 6. Copying Utilities
@@ -1152,4 +1642,5 @@ document.addEventListener('DOMContentLoaded', () => {
     initSecurityPanel();
     loadScenarios();
     initOpenRouterModels();
+    initToolsUI();
 });
