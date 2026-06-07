@@ -1386,3 +1386,136 @@ input[type="range"]::-webkit-slider-thumb:hover {
     border: 1px solid rgba(0, 0, 0, 0.08);
 }
 
+/* Gelişmiş Seçenekler Butonu & Grid */
+.btn-toggle-advanced {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.85rem;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px dashed var(--border-color);
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+    font-family: var(--font-body);
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition-normal);
+    margin: 1.5rem 0 0.5rem 0;
+    outline: none;
+}
+.btn-toggle-advanced:hover {
+    background: rgba(139, 92, 246, 0.06);
+    border-color: var(--accent-gemini-secondary);
+    color: var(--text-primary);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 15px rgba(139, 92, 246, 0.1);
+}
+.btn-toggle-advanced .arrow-icon {
+    font-size: 0.75rem;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.btn-toggle-advanced.active {
+    background: rgba(139, 92, 246, 0.06);
+    border-color: var(--accent-gemini-secondary);
+    color: var(--text-primary);
+}
+.btn-toggle-advanced.active .arrow-icon {
+    transform: rotate(180deg);
+}
+
+.form-grid.advanced-grid {
+    max-height: 0;
+    opacity: 0;
+    overflow: hidden;
+    transform: translateY(-8px);
+    transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s ease, transform 0.4s ease, margin 0.4s ease;
+    margin-top: 0;
+    margin-bottom: 0;
+    visibility: hidden;
+    pointer-events: none;
+}
+.form-grid.advanced-grid.show {
+    max-height: 1200px;
+    opacity: 1;
+    transform: translateY(0);
+    margin-top: 1rem;
+    margin-bottom: 1rem;
+    visibility: visible;
+    pointer-events: auto;
+}
+
+/* Tanıtım Butonu & Modalı */
+.header-info-trigger-wrapper {
+    margin-top: 0.85rem;
+    display: flex;
+    justify-content: center;
+}
+.btn-about-trigger {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--border-color);
+    border-radius: 20px;
+    color: var(--text-secondary);
+    font-family: var(--font-body);
+    font-size: 0.85rem;
+    font-weight: 500;
+    padding: 0.45rem 1.25rem;
+    cursor: pointer;
+    transition: var(--transition-fast);
+}
+.btn-about-trigger:hover {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.15);
+    color: var(--text-primary);
+    transform: translateY(-1px);
+}
+.about-dialog {
+    max-width: 600px !important;
+}
+.about-dialog-content h3 {
+    margin-top: 0.25rem;
+    margin-bottom: 0.4rem;
+    color: var(--accent-gemini-secondary);
+    font-size: 1.05rem;
+    font-family: var(--font-heading);
+    font-weight: 600;
+}
+.about-dialog-content p {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    line-height: 1.55;
+    margin-bottom: 0.5rem;
+}
+.about-dialog-content ul {
+    padding-left: 1.2rem;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    line-height: 1.5;
+}
+.about-dialog-content li {
+    margin-bottom: 0.4rem;
+}
+.about-dialog-content li strong {
+    color: var(--text-primary);
+}
+
+/* Light Theme Overrides for About Dialog & Advanced Options */
+:root.light-theme .btn-toggle-advanced {
+    background: rgba(0, 0, 0, 0.01);
+}
+:root.light-theme .btn-toggle-advanced:hover,
+:root.light-theme .btn-toggle-advanced.active {
+    background: rgba(139, 92, 246, 0.04);
+    color: var(--text-primary);
+}
+:root.light-theme .btn-about-trigger {
+    background: rgba(0, 0, 0, 0.02);
+}
+:root.light-theme .btn-about-trigger:hover {
+    background: rgba(0, 0, 0, 0.05);
+}
+:root.light-theme .about-dialog-content h3 {
+    color: #6d28d9; /* Deep violet for readability in light mode */
+}

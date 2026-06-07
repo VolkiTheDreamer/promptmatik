@@ -105,6 +105,15 @@ const els = {
     apiSettingsDialog: document.getElementById('api-settings-dialog'),
     btnCloseApiDialog: document.getElementById('btn-close-api-dialog'),
     
+    // Advanced Options Toggle
+    btnToggleAdvanced: document.getElementById('btn-toggle-advanced'),
+    advancedOptionsGrid: document.getElementById('advanced-options-grid'),
+    
+    // About Modal
+    btnShowAbout: document.getElementById('btn-show-about'),
+    aboutInfoDialog: document.getElementById('about-info-dialog'),
+    btnCloseAboutDialog: document.getElementById('btn-close-about-dialog'),
+    
     // Tools / Function Calling Elements
     enableTools: document.getElementById('enable-tools'),
     toolsToggleHeader: document.getElementById('tools-toggle-header'),
@@ -1795,6 +1804,26 @@ function setupEventListeners() {
             }
         });
     }
+
+    // Advanced Options Toggle
+    els.btnToggleAdvanced.addEventListener('click', () => {
+        const isShow = els.advancedOptionsGrid.classList.toggle('show');
+        els.btnToggleAdvanced.classList.toggle('active', isShow);
+        els.btnToggleAdvanced.setAttribute('aria-expanded', isShow);
+    });
+
+    // About Modal Toggle
+    els.btnShowAbout.addEventListener('click', () => {
+        els.aboutInfoDialog.showModal();
+    });
+    els.btnCloseAboutDialog.addEventListener('click', () => {
+        els.aboutInfoDialog.close();
+    });
+    els.aboutInfoDialog.addEventListener('click', (e) => {
+        if (e.target === els.aboutInfoDialog) {
+            els.aboutInfoDialog.close();
+        }
+    });
 
     // Runner & Copiers
     els.btnCopyPrompt.addEventListener('click', copyPromptToClipboard);
