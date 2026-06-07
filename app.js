@@ -12,7 +12,11 @@ const state = {
         openai: null,
         deepseek: null,
         anthropic: null,
-        openrouter: null
+        openrouter: null,
+        alibaba: null,
+        meta: null,
+        nvidia: null,
+        xai: null
     },
     currentProvider: 'gemini'
 };
@@ -24,7 +28,11 @@ let openRouterModels = [
     { id: 'openai/gpt-4o-mini', name: 'OpenAI: GPT-4o Mini', description: 'OpenAI\'ın hızlı, hafif ve düşük maliyetli akıllı modeli.' },
     { id: 'openai/gpt-4o', name: 'OpenAI: GPT-4o', description: 'OpenAI\'ın en gelişmiş, çok yönlü amiral gemisi yapay zeka modeli.' },
     { id: 'deepseek/deepseek-chat', name: 'Deepseek: Deepseek V3', description: 'DeepSeek V3. Yüksek kaliteli, hızlı ve son derece ekonomik kodlama ve metin modeli.' },
-    { id: 'anthropic/claude-3-5-sonnet', name: 'Anthropic: Claude 3.5 Sonnet', description: 'Anthropic\'in kod yazma, analiz ve yaratıcı içerik üretiminde lider amiral gemisi modeli.' }
+    { id: 'anthropic/claude-3-5-sonnet', name: 'Anthropic: Claude 3.5 Sonnet', description: 'Anthropic\'in kod yazma, analiz ve yaratıcı içerik üretiminde lider amiral gemisi modeli.' },
+    { id: 'alibaba/qwen-2.5-72b-instruct', name: 'Alibaba: Qwen 2.5 72B Instruct', description: 'Alibaba\'nın güçlü ve çok dilli genel amaçlı dil modeli.' },
+    { id: 'meta-llama/llama-3.3-70b-instruct', name: 'Meta: Llama 3.3 70B Instruct', description: 'Meta\'nın en yeni ve yüksek kaliteli açık kaynaklı yapay zeka modeli.' },
+    { id: 'nvidia/llama-3.1-nemotron-70b-instruct', name: 'NVIDIA: Llama 3.1 Nemotron 70B', description: 'NVIDIA tarafından optimize edilmiş, yüksek yanıt kalitesine sahip 70B model.' },
+    { id: 'xai/grok-2', name: 'xAI: Grok 2', description: 'xAI\'ın gerçek zamanlı bilgi erişimine sahip en son modeli.' }
 ];
 
 // DOM Elements
@@ -188,7 +196,7 @@ function getToolsPayload(provider) {
         throw new Error('Geçersiz JSON Şeması: ' + e.message);
     }
     
-    if (provider === 'openai' || provider === 'deepseek' || provider === 'openrouter') {
+    if (provider === 'openai' || provider === 'deepseek' || provider === 'openrouter' || provider === 'alibaba' || provider === 'meta' || provider === 'nvidia' || provider === 'xai') {
         return [
             {
                 type: "function",
@@ -278,6 +286,14 @@ function getApiUrl(provider, directUrl) {
             return directUrl.replace('https://api.anthropic.com', '/api-anthropic');
         case 'openrouter':
             return directUrl.replace('https://openrouter.ai', '/api-openrouter');
+        case 'alibaba':
+            return directUrl.replace('https://dashscope.aliyuncs.com', '/api-alibaba');
+        case 'meta':
+            return directUrl.replace('https://api.llama-api.com', '/api-meta');
+        case 'nvidia':
+            return directUrl.replace('https://integrate.api.nvidia.com', '/api-nvidia');
+        case 'xai':
+            return directUrl.replace('https://api.x.ai', '/api-xai');
         default:
             return directUrl;
     }
@@ -591,10 +607,14 @@ function showUnlockedState(provider) {
     els.panelUnlocked.classList.remove('hidden');
     
     const friendlyNames = {
-        gemini: 'Google Gemini (Doğrudan)',
-        openai: 'OpenAI (Doğrudan)',
-        deepseek: 'Deepseek (Doğrudan)',
+        alibaba: 'Alibaba (Doğrudan)',
         anthropic: 'Anthropic (Doğrudan)',
+        deepseek: 'Deepseek (Doğrudan)',
+        gemini: 'Google (Doğrudan)',
+        meta: 'Meta (Doğrudan)',
+        nvidia: 'NVIDIA (Doğrudan)',
+        openai: 'OpenAI (Doğrudan)',
+        xai: 'xAI (Doğrudan)',
         openrouter: 'OpenRouter (Tüm Modeller)'
     };
     
@@ -618,25 +638,36 @@ function updateUnlockedProviderDropdown(activeProvider) {
     els.unlockedProviderSelect.innerHTML = '';
     
     const friendlyNames = {
-        gemini: 'Google Gemini (Doğrudan)',
-        openai: 'OpenAI (Doğrudan)',
-        deepseek: 'Deepseek (Doğrudan)',
+        alibaba: 'Alibaba (Doğrudan)',
         anthropic: 'Anthropic (Doğrudan)',
+        deepseek: 'Deepseek (Doğrudan)',
+        gemini: 'Google (Doğrudan)',
+        meta: 'Meta (Doğrudan)',
+        nvidia: 'NVIDIA (Doğrudan)',
+        openai: 'OpenAI (Doğrudan)',
+        xai: 'xAI (Doğrudan)',
         openrouter: 'OpenRouter (Tüm Modeller)'
     };
     
-    let hasKeys = false;
-    for (const p in state.activeKeys) {
-        if (state.activeKeys[p]) {
-            const opt = document.createElement('option');
-            opt.value = p;
-            opt.textContent = friendlyNames[p] || p;
-            els.unlockedProviderSelect.appendChild(opt);
-            hasKeys = true;
-        }
-    }
+    const activeProviders = Object.keys(state.activeKeys).filter(p => state.activeKeys[p]);
     
-    if (hasKeys) {
+    // Sort providers alphabetically by friendly names, keeping openrouter at the bottom
+    activeProviders.sort((a, b) => {
+        if (a === 'openrouter') return 1;
+        if (b === 'openrouter') return -1;
+        const nameA = (friendlyNames[a] || a).toLowerCase();
+        const nameB = (friendlyNames[b] || b).toLowerCase();
+        return nameA.localeCompare(nameB);
+    });
+    
+    activeProviders.forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p;
+        opt.textContent = friendlyNames[p] || p;
+        els.unlockedProviderSelect.appendChild(opt);
+    });
+    
+    if (activeProviders.length > 0) {
         els.unlockedProviderSelect.value = activeProvider;
     }
 }
@@ -654,10 +685,14 @@ function updateRunButtonTooltip() {
     }
     
     const providerNames = {
-        gemini: 'Gemini',
-        openai: 'OpenAI',
-        deepseek: 'Deepseek',
+        alibaba: 'Alibaba',
         anthropic: 'Anthropic',
+        deepseek: 'Deepseek',
+        gemini: 'Google',
+        meta: 'Meta',
+        nvidia: 'NVIDIA',
+        openai: 'OpenAI',
+        xai: 'xAI',
         openrouter: 'OpenRouter'
     };
     const friendlyProvider = providerNames[provider] || provider;
@@ -672,6 +707,10 @@ function updateRunButtonTooltip() {
             else if (provider === 'openai') modelId = 'openai/gpt-4o-mini';
             else if (provider === 'deepseek') modelId = 'deepseek/deepseek-chat';
             else if (provider === 'anthropic') modelId = 'anthropic/claude-3-5-sonnet';
+            else if (provider === 'alibaba') modelId = 'alibaba/qwen-2.5-72b-instruct';
+            else if (provider === 'meta') modelId = 'meta-llama/llama-3.3-70b-instruct';
+            else if (provider === 'nvidia') modelId = 'nvidia/llama-3.1-nemotron-70b-instruct';
+            else if (provider === 'xai') modelId = 'xai/grok-2';
             else if (provider === 'openrouter') modelId = 'google/gemini-1.5-flash';
         }
         const modelObj = openRouterModels.find(m => m.id === modelId);
@@ -695,6 +734,14 @@ function updateUnlockedModelOptions(provider) {
         filtered = openRouterModels.filter(m => m.id.startsWith('deepseek/'));
     } else if (provider === 'anthropic') {
         filtered = openRouterModels.filter(m => m.id.startsWith('anthropic/'));
+    } else if (provider === 'alibaba') {
+        filtered = openRouterModels.filter(m => m.id.startsWith('alibaba/'));
+    } else if (provider === 'meta') {
+        filtered = openRouterModels.filter(m => m.id.startsWith('meta-llama/') || m.id.startsWith('meta/'));
+    } else if (provider === 'nvidia') {
+        filtered = openRouterModels.filter(m => m.id.startsWith('nvidia/'));
+    } else if (provider === 'xai') {
+        filtered = openRouterModels.filter(m => m.id.startsWith('xai/'));
     } else if (provider === 'openrouter') {
         filtered = openRouterModels;
     }
@@ -781,8 +828,12 @@ function getProviderName(modelId) {
         case 'openai': return 'OpenAI';
         case 'google': return 'Google';
         case 'anthropic': return 'Anthropic';
+        case 'meta':
         case 'meta-llama': return 'Meta';
         case 'deepseek': return 'Deepseek';
+        case 'alibaba': return 'Alibaba';
+        case 'nvidia': return 'NVIDIA';
+        case 'xai': return 'xAI';
         case 'mistralai': return 'Mistral AI';
         case 'cohere': return 'Cohere';
         case 'microsoft': return 'Microsoft';
@@ -805,6 +856,14 @@ function updateModelOptions() {
         filtered = openRouterModels.filter(m => m.id.startsWith('deepseek/'));
     } else if (apiProvider === 'anthropic') {
         filtered = openRouterModels.filter(m => m.id.startsWith('anthropic/'));
+    } else if (apiProvider === 'alibaba') {
+        filtered = openRouterModels.filter(m => m.id.startsWith('alibaba/'));
+    } else if (apiProvider === 'meta') {
+        filtered = openRouterModels.filter(m => m.id.startsWith('meta-llama/') || m.id.startsWith('meta/'));
+    } else if (apiProvider === 'nvidia') {
+        filtered = openRouterModels.filter(m => m.id.startsWith('nvidia/'));
+    } else if (apiProvider === 'xai') {
+        filtered = openRouterModels.filter(m => m.id.startsWith('xai/'));
     } else if (apiProvider === 'openrouter') {
         filtered = openRouterModels;
     }
@@ -1004,7 +1063,7 @@ function deleteSavedKey() {
         localStorage.removeItem('encrypted_api_keys');
         localStorage.removeItem('active_provider');
         
-        const providers = ['gemini', 'openai', 'deepseek', 'anthropic', 'openrouter'];
+        const providers = ['gemini', 'openai', 'deepseek', 'anthropic', 'openrouter', 'alibaba', 'meta', 'nvidia', 'xai'];
         providers.forEach(p => {
             localStorage.removeItem(`selected_model_${p}`);
             state.activeKeys[p] = null;
@@ -1058,7 +1117,7 @@ async function runAPIRequest() {
     try {
         let aiResponse = '';
         
-        if (provider === 'openai' || provider === 'deepseek' || provider === 'openrouter') {
+        if (provider === 'openai' || provider === 'deepseek' || provider === 'openrouter' || provider === 'alibaba' || provider === 'meta' || provider === 'nvidia' || provider === 'xai') {
             let modelId = model;
             let targetUrl = '';
             
@@ -1075,6 +1134,26 @@ async function runAPIRequest() {
             } else if (provider === 'openrouter') {
                 if (!modelId) modelId = 'google/gemini-1.5-flash';
                 targetUrl = getApiUrl('openrouter', 'https://openrouter.ai/api/v1/chat/completions');
+            } else if (provider === 'alibaba') {
+                if (!modelId) modelId = 'alibaba/qwen-2.5-72b-instruct';
+                const cleanModel = modelId.replace('alibaba/', '');
+                targetUrl = getApiUrl('alibaba', 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions');
+                modelId = cleanModel;
+            } else if (provider === 'meta') {
+                if (!modelId) modelId = 'meta-llama/llama-3.3-70b-instruct';
+                const cleanModel = modelId.replace('meta-llama/', '').replace('meta/', '');
+                targetUrl = getApiUrl('meta', 'https://api.llama-api.com/chat/completions');
+                modelId = cleanModel;
+            } else if (provider === 'nvidia') {
+                if (!modelId) modelId = 'nvidia/llama-3.1-nemotron-70b-instruct';
+                const cleanModel = modelId.replace('nvidia/', '');
+                targetUrl = getApiUrl('nvidia', 'https://integrate.api.nvidia.com/v1/chat/completions');
+                modelId = cleanModel;
+            } else if (provider === 'xai') {
+                if (!modelId) modelId = 'xai/grok-2';
+                const cleanModel = modelId.replace('xai/', '');
+                targetUrl = getApiUrl('xai', 'https://api.x.ai/v1/chat/completions');
+                modelId = cleanModel;
             }
 
             const requestBody = {
@@ -1258,7 +1337,7 @@ async function runAPIRequest() {
                 OpenAI, Anthropic ve Deepseek API'leri, API anahtarınızın güvenliği nedeniyle doğrudan tarayıcı üzerinden (client-side) gelen istekleri varsayılan olarak engeller (CORS Politikası).<br><br>
                 <strong>Çözüm Yolları:</strong><br>
                 1. <strong>OpenRouter Kullanın (Önerilen/Kesin Çözüm):</strong> OpenRouter tarayıcı isteklerine (CORS) izin verir ve tüm bu modelleri (GPT-4o, Claude 3.5, Deepseek V3 vb.) destekler. Ayarlar (⚙️) menüsünden bağlantı türünü OpenRouter olarak değiştirebilirsiniz.<br>
-                2. <strong>Gemini Kullanın:</strong> Google Gemini API tarayıcıdan doğrudan gelen (URL parametreli) istekleri destekler.<br>
+                2. <strong>Google Kullanın:</strong> Google API tarayıcıdan doğrudan gelen (URL parametreli) istekleri destekler.<br>
                 3. Tarayıcınıza <em>CORS Unblock</em> benzeri bir geliştirici eklentisi kurarak veya tarayıcı CORS güvenliğini geçici olarak kapatarak test edebilirsiniz.
             `;
         }
@@ -1381,7 +1460,7 @@ function renderToolCallUI(provider, modelId, key, temperature, promptText, toolC
         try {
             let finalResponseText = '';
             
-            if (provider === 'openai' || provider === 'deepseek' || provider === 'openrouter') {
+            if (provider === 'openai' || provider === 'deepseek' || provider === 'openrouter' || provider === 'alibaba' || provider === 'meta' || provider === 'nvidia' || provider === 'xai') {
                 const secondMessages = [
                     { role: 'user', content: promptText },
                     { 
@@ -1411,6 +1490,18 @@ function renderToolCallUI(provider, modelId, key, temperature, promptText, toolC
                     targetUrl = getApiUrl('deepseek', 'https://api.deepseek.com/chat/completions');
                 } else if (provider === 'openrouter') {
                     targetUrl = getApiUrl('openrouter', 'https://openrouter.ai/api/v1/chat/completions');
+                } else if (provider === 'alibaba') {
+                    cleanModel = modelId.replace('alibaba/', '');
+                    targetUrl = getApiUrl('alibaba', 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions');
+                } else if (provider === 'meta') {
+                    cleanModel = modelId.replace('meta-llama/', '').replace('meta/', '');
+                    targetUrl = getApiUrl('meta', 'https://api.llama-api.com/chat/completions');
+                } else if (provider === 'nvidia') {
+                    cleanModel = modelId.replace('nvidia/', '');
+                    targetUrl = getApiUrl('nvidia', 'https://integrate.api.nvidia.com/v1/chat/completions');
+                } else if (provider === 'xai') {
+                    cleanModel = modelId.replace('xai/', '');
+                    targetUrl = getApiUrl('xai', 'https://api.x.ai/v1/chat/completions');
                 }
                 
                 const response = await fetch(targetUrl, {
@@ -1624,10 +1715,14 @@ function setupEventListeners() {
         localStorage.setItem('active_provider', provider);
         
         const friendlyNames = {
-            gemini: 'Google Gemini (Doğrudan)',
-            openai: 'OpenAI (Doğrudan)',
-            deepseek: 'Deepseek (Doğrudan)',
+            alibaba: 'Alibaba (Doğrudan)',
             anthropic: 'Anthropic (Doğrudan)',
+            deepseek: 'Deepseek (Doğrudan)',
+            gemini: 'Google (Doğrudan)',
+            meta: 'Meta (Doğrudan)',
+            nvidia: 'NVIDIA (Doğrudan)',
+            openai: 'OpenAI (Doğrudan)',
+            xai: 'xAI (Doğrudan)',
             openrouter: 'OpenRouter (Tüm Modeller)'
         };
         els.activeApiText.textContent = `${friendlyNames[provider] || provider} API Aktif (Hafızada)`;
@@ -1735,7 +1830,7 @@ async function fetchOpenRouterModels() {
         const data = await response.json();
         if (data && data.data && data.data.length > 0) {
             // Sadece bulutta çalışan prestijli sağlayıcıların modellerini tutalım (yerel/deneysel modelleri süzelim)
-            const allowedPrefixes = ['openai', 'google', 'anthropic', 'deepseek', 'meta-llama', 'meta', 'mistralai', 'cohere', 'microsoft'];
+            const allowedPrefixes = ['openai', 'google', 'anthropic', 'deepseek', 'meta-llama', 'meta', 'mistralai', 'cohere', 'microsoft', 'alibaba', 'nvidia', 'xai'];
             openRouterModels = data.data.filter(m => {
                 const prefix = m.id.split('/')[0];
                 const isAllowedPrefix = allowedPrefixes.includes(prefix);

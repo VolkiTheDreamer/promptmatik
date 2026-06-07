@@ -28,6 +28,26 @@ export default defineConfig({
         target: 'https://openrouter.ai',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api-openrouter/, '')
+      },
+      '/api-alibaba': {
+        target: 'https://dashscope.aliyuncs.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api-alibaba/, '')
+      },
+      '/api-meta': {
+        target: 'https://api.llama-api.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api-meta/, '')
+      },
+      '/api-nvidia': {
+        target: 'https://integrate.api.nvidia.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api-nvidia/, '')
+      },
+      '/api-xai': {
+        target: 'https://api.x.ai',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api-xai/, '')
       }
     }
   }
