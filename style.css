@@ -905,13 +905,14 @@ input[type="range"]::-webkit-slider-thumb:hover {
     padding: 0;
     max-width: 500px;
     width: 90%;
+    max-height: 88vh;
+    overflow-y: auto;
     border-radius: var(--radius-lg);
     box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-    margin: auto;
     position: fixed;
-    top: 50%;
+    top: 4vh;
     left: 50%;
-    transform: translate(-50%, -50%);
+    transform: translate(-50%, 0);
     outline: none;
     z-index: 1000;
 }
@@ -930,11 +931,11 @@ input[type="range"]::-webkit-slider-thumb:hover {
 @keyframes modalFadeIn {
     from {
         opacity: 0;
-        transform: translate(-50%, -45%) scale(0.95);
+        transform: translate(-50%, -15px) scale(0.95);
     }
     to {
         opacity: 1;
-        transform: translate(-50%, -50%) scale(1);
+        transform: translate(-50%, 0) scale(1);
     }
 }
 
@@ -1135,8 +1136,8 @@ input[type="range"]::-webkit-slider-thumb:hover {
     z-index: 100;
 }
 
-.tooltip-wrapper:has(button:disabled):hover::after,
-.tooltip-wrapper:has(button:disabled):hover::before {
+.tooltip-wrapper:hover::after,
+.tooltip-wrapper:hover::before {
     opacity: 1;
     transform: translateX(-50%) translateY(0);
 }

@@ -61,6 +61,7 @@ const els = {
     panelLocked: document.getElementById('api-panel-locked'),
     panelSetup: document.getElementById('api-panel-setup'),
     unlockedModelSelect: document.getElementById('unlocked-model-select'),
+    unlockedProviderSelect: document.getElementById('unlocked-provider-select'),
     btnShowSetup: document.getElementById('btn-show-setup'),
     btnLockSession: document.getElementById('btn-lock-session'),
     btnCancelSetup: document.getElementById('btn-cancel-setup'),
@@ -541,26 +542,15 @@ function clearForm() {
 // 4. API Key Security & localstorage (AES-256)
 // --------------------------------------------------
 function initSecurityPanel() {
-    const providers = ['gemini', 'openai', 'deepseek', 'anthropic', 'openrouter'];
-    let foundProvider = null;
-    
-    for (const p of providers) {
-        if (localStorage.getItem(`encrypted_key_${p}`)) {
-            foundProvider = p;
-            break;
-        }
-    }
-    
-    if (foundProvider) {
-        showLockedState(foundProvider);
+    const encryptedStore = localStorage.getItem('encrypted_api_keys');
+    if (encryptedStore) {
+        showLockedState();
     } else {
         showSetupState();
     }
 }
 
-function showLockedState(provider) {
-    state.currentProvider = provider;
-    
+function showLockedState() {
     els.panelLocked.classList.remove('hidden');
     els.panelSetup.classList.add('hidden');
     els.panelUnlocked.classList.add('hidden');
@@ -569,6 +559,7 @@ function showLockedState(provider) {
     els.statusBadge.className = 'security-status status-locked';
     els.btnRunPrompt.disabled = true;
     els.unlockPin.value = '';
+    updateRunButtonTooltip();
 }
 
 function showSetupState() {
@@ -576,8 +567,8 @@ function showSetupState() {
     els.panelSetup.classList.remove('hidden');
     els.panelUnlocked.classList.add('hidden');
     
-    // Show cancel button only if at least one key is saved in localStorage
-    const keysSaved = ['gemini', 'openai', 'deepseek', 'anthropic', 'openrouter'].some(p => localStorage.getItem(`encrypted_key_${p}`));
+    // Show cancel button only if encrypted_api_keys exists in localStorage
+    const keysSaved = !!localStorage.getItem('encrypted_api_keys');
     if (keysSaved) {
         els.btnCancelSetup.classList.remove('hidden');
     } else {
@@ -589,6 +580,7 @@ function showSetupState() {
     els.btnRunPrompt.disabled = true;
     
     updateModelOptions();
+    updateRunButtonTooltip();
 }
 
 function showUnlockedState(provider) {
@@ -612,12 +604,83 @@ function showUnlockedState(provider) {
     els.statusBadge.className = 'security-status status-unlocked';
     els.btnRunPrompt.disabled = false;
     
+    updateUnlockedProviderDropdown(provider);
     updateUnlockedModelOptions(provider);
+    updateRunButtonTooltip();
     
     // Auto-close settings modal on successful unlock/save
     if (els.apiSettingsDialog && els.apiSettingsDialog.open) {
         els.apiSettingsDialog.close();
     }
+}
+
+function updateUnlockedProviderDropdown(activeProvider) {
+    els.unlockedProviderSelect.innerHTML = '';
+    
+    const friendlyNames = {
+        gemini: 'Google Gemini (Doğrudan)',
+        openai: 'OpenAI (Doğrudan)',
+        deepseek: 'Deepseek (Doğrudan)',
+        anthropic: 'Anthropic (Doğrudan)',
+        openrouter: 'OpenRouter (Tüm Modeller)'
+    };
+    
+    let hasKeys = false;
+    for (const p in state.activeKeys) {
+        if (state.activeKeys[p]) {
+            const opt = document.createElement('option');
+            opt.value = p;
+            opt.textContent = friendlyNames[p] || p;
+            els.unlockedProviderSelect.appendChild(opt);
+            hasKeys = true;
+        }
+    }
+    
+    if (hasKeys) {
+        els.unlockedProviderSelect.value = activeProvider;
+    }
+}
+
+function updateRunButtonTooltip() {
+    const wrapper = els.btnRunPrompt.parentElement;
+    if (!wrapper) return;
+    
+    const provider = state.currentProvider;
+    const key = state.activeKeys[provider];
+    
+    if (!key) {
+        wrapper.setAttribute('data-tooltip', 'Doğrudan çalıştırmak için sağ üstteki ⚙️ butonundan API anahtarınızı girin.');
+        return;
+    }
+    
+    const providerNames = {
+        gemini: 'Gemini',
+        openai: 'OpenAI',
+        deepseek: 'Deepseek',
+        anthropic: 'Anthropic',
+        openrouter: 'OpenRouter'
+    };
+    const friendlyProvider = providerNames[provider] || provider;
+    
+    let modelName = 'Varsayılan';
+    if (els.unlockedModelSelect && els.unlockedModelSelect.options && els.unlockedModelSelect.selectedIndex >= 0) {
+        modelName = els.unlockedModelSelect.options[els.unlockedModelSelect.selectedIndex].text;
+    } else {
+        let modelId = localStorage.getItem(`selected_model_${provider}`);
+        if (!modelId) {
+            if (provider === 'gemini') modelId = 'google/gemini-1.5-flash';
+            else if (provider === 'openai') modelId = 'openai/gpt-4o-mini';
+            else if (provider === 'deepseek') modelId = 'deepseek/deepseek-chat';
+            else if (provider === 'anthropic') modelId = 'anthropic/claude-3-5-sonnet';
+            else if (provider === 'openrouter') modelId = 'google/gemini-1.5-flash';
+        }
+        const modelObj = openRouterModels.find(m => m.id === modelId);
+        if (modelObj) {
+            modelName = modelObj.name.includes(':') ? modelObj.name.split(':')[1].trim() : modelObj.name;
+        }
+    }
+    
+    wrapper.setAttribute('data-tooltip', `Aktif Bağlantı: ${friendlyProvider} | Model: ${modelName}`);
 }
 
 function updateUnlockedModelOptions(provider) {
@@ -838,16 +901,38 @@ function saveEncryptedKey() {
         return;
     }
 
+    let keysObj = {};
+    const encryptedStore = localStorage.getItem('encrypted_api_keys');
+    if (encryptedStore) {
+        try {
+            const bytes = CryptoJS.AES.decrypt(encryptedStore, pin);
+            const decryptedRaw = bytes.toString(CryptoJS.enc.Utf8);
+            if (!decryptedRaw) {
+                throw new Error('Yanlış PIN');
+            }
+            keysObj = JSON.parse(decryptedRaw);
+        } catch (e) {
+            showToast('Girilen PIN, mevcut kayıtlı anahtarların şifresiyle uyuşmuyor! Lütfen doğru şifrenizi girin.', 'error');
+            return;
+        }
+    }
+
+    // Add/update key for this provider
+    keysObj[provider] = key;
+
     try {
-        // Encrypt key using AES
-        const encrypted = CryptoJS.AES.encrypt(key, pin).toString();
+        // Encrypt the entire object using AES
+        const encrypted = CryptoJS.AES.encrypt(JSON.stringify(keysObj), pin).toString();
         
-        // Save encrypted key and selected model
-        localStorage.setItem(`encrypted_key_${provider}`, encrypted);
+        // Save encrypted store
+        localStorage.setItem('encrypted_api_keys', encrypted);
+        localStorage.setItem('active_provider', provider);
         localStorage.setItem(`selected_model_${provider}`, model);
         
-        // Store raw key directly in memory (RAM)
-        state.activeKeys[provider] = key;
+        // Load keys in RAM
+        for (const p in keysObj) {
+            state.activeKeys[p] = keysObj[p];
+        }
         state.currentProvider = provider;
         
         // Clean input fields immediately
@@ -855,17 +940,16 @@ function saveEncryptedKey() {
         els.setupPin.value = '';
         
         showUnlockedState(provider);
-        showToast('API Anahtarınız şifrelendi ve başarıyla kaydedildi!', 'success');
+        showToast(`${provider.toUpperCase()} API anahtarı başarıyla kaydedildi!`, 'success');
     } catch (e) {
         console.error(e);
-        showToast('Anahtar şifrelenirken hata oluştu.', 'error');
+        showToast('Anahtarlar şifrelenirken hata oluştu.', 'error');
     }
 }
 
 function unlockKey() {
-    const provider = state.currentProvider;
     const pin = els.unlockPin.value;
-    const encrypted = localStorage.getItem(`encrypted_key_${provider}`);
+    const encryptedStore = localStorage.getItem('encrypted_api_keys');
 
     if (!pin) {
         showToast('Lütfen PIN kodunuzu girin.', 'error');
@@ -873,28 +957,41 @@ function unlockKey() {
     }
 
     try {
-        // Decrypt key
-        const bytes = CryptoJS.AES.decrypt(encrypted, pin);
+        // Decrypt keys object
+        const bytes = CryptoJS.AES.decrypt(encryptedStore, pin);
         const decryptedRaw = bytes.toString(CryptoJS.enc.Utf8);
 
-        // Verification of decrypted output (basic key format validation)
-        if (!decryptedRaw || decryptedRaw.length < 10) {
-            throw new Error('Yanlış deşifre veya geçersiz key');
+        if (!decryptedRaw) {
+            throw new Error('Yanlış deşifre');
         }
 
-        // Sanitize decrypted key: remove spaces, tabs, newlines, zero-width characters, etc.
-        const decrypted = decryptedRaw.trim().replace(/[^\x21-\x7E]/g, '');
-
-        // If wrong PIN, UTF-8 decryption will produce garbage. Sanitizing it (removing non-ASCII)
-        // will result in a very short or empty string, failing the length check.
-        if (decrypted.length < 10) {
-            throw new Error('Yanlış deşifre veya geçersiz key');
-        }
-
-        // Store in RAM
-        state.activeKeys[provider] = decrypted;
+        const keysObj = JSON.parse(decryptedRaw);
         
-        showUnlockedState(provider);
+        // Basic keys sanity check
+        const providers = Object.keys(keysObj);
+        if (providers.length === 0) {
+            throw new Error('Geçersiz anahtarlar');
+        }
+
+        // Store all in RAM
+        for (const p in state.activeKeys) {
+            state.activeKeys[p] = null;
+        }
+        for (const p in keysObj) {
+            state.activeKeys[p] = keysObj[p].trim().replace(/[^\x21-\x7E]/g, '');
+        }
+        
+        // Resolve active provider
+        let activeProvider = localStorage.getItem('active_provider');
+        const savedProviders = Object.keys(keysObj).filter(p => keysObj[p]);
+        if (!activeProvider || !savedProviders.includes(activeProvider)) {
+            activeProvider = savedProviders[0] || 'gemini';
+        }
+        
+        state.currentProvider = activeProvider;
+        localStorage.setItem('active_provider', activeProvider);
+        
+        showUnlockedState(activeProvider);
         showToast('Kilit başarıyla açıldı! API kullanıma hazır.', 'success');
     } catch (e) {
         console.error(e);
@@ -903,12 +1000,17 @@ function unlockKey() {
 }
 
 function deleteSavedKey() {
-    const provider = state.currentProvider;
-    if (confirm('Kayıtlı şifreli API anahtarını silmek istediğinize emin misiniz?')) {
-        localStorage.removeItem(`encrypted_key_${provider}`);
-        localStorage.removeItem(`selected_model_${provider}`);
-        state.activeKeys[provider] = null;
-        showToast('Kayıtlı anahtar silindi.', 'warning');
+    if (confirm('Kayıtlı TÜM şifreli API anahtarlarını silmek istediğinize emin misiniz?')) {
+        localStorage.removeItem('encrypted_api_keys');
+        localStorage.removeItem('active_provider');
+        
+        const providers = ['gemini', 'openai', 'deepseek', 'anthropic', 'openrouter'];
+        providers.forEach(p => {
+            localStorage.removeItem(`selected_model_${p}`);
+            state.activeKeys[p] = null;
+        });
+        
+        showToast('Kayıtlı tüm anahtarlar silindi.', 'warning');
         showSetupState();
     }
 }
@@ -1516,10 +1618,30 @@ function setupEventListeners() {
     els.btnDeleteKey.addEventListener('click', deleteSavedKey);
     
     // Unlocked settings actions
+    els.unlockedProviderSelect.addEventListener('change', (e) => {
+        const provider = e.target.value;
+        state.currentProvider = provider;
+        localStorage.setItem('active_provider', provider);
+        
+        const friendlyNames = {
+            gemini: 'Google Gemini (Doğrudan)',
+            openai: 'OpenAI (Doğrudan)',
+            deepseek: 'Deepseek (Doğrudan)',
+            anthropic: 'Anthropic (Doğrudan)',
+            openrouter: 'OpenRouter (Tüm Modeller)'
+        };
+        els.activeApiText.textContent = `${friendlyNames[provider] || provider} API Aktif (Hafızada)`;
+        
+        updateUnlockedModelOptions(provider);
+        updateRunButtonTooltip();
+        showToast(`Sağlayıcı ${provider.toUpperCase()} olarak değiştirildi.`, 'success', 1500);
+    });
+
     els.unlockedModelSelect.addEventListener('change', (e) => {
         const model = e.target.value;
         localStorage.setItem(`selected_model_${state.currentProvider}`, model);
         updateModelDescription(els.unlockedModelSelect, 'unlocked-model-desc');
+        updateRunButtonTooltip();
         showToast('Aktif model güncellendi.', 'success', 1500);
     });
 
